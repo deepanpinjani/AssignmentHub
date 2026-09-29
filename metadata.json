@@ -1,0 +1,6 @@
+{
+  "name": "AssignmentHub",
+  "description": "A college assignment management platform for professors and students with real-time deadline validation and role-based access.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

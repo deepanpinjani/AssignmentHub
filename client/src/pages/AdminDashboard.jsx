@@ -37,6 +37,9 @@ const AdminDashboard = () => {
   const [submissions, setSubmissions] = useState([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
   const [submissionError, setSubmissionError] = useState('');
+  const [reviewDrafts, setReviewDrafts] = useState({});
+  const [reviewResults, setReviewResults] = useState({});
+  const [savingReviewId, setSavingReviewId] = useState('');
 
   // Fetch created assignments
   const fetchAssignments = async () => {
@@ -117,6 +120,15 @@ const AdminDashboard = () => {
       const data = await apiService.getSubmissionsForAssignment(assignment._id);
       if (data.success) {
         setSubmissions(data.submissions || []);
+        setReviewDrafts(Object.fromEntries((data.submissions || []).map((submission) => [
+          submission._id,
+          {
+            reviewStatus: submission.reviewStatus === 'Pending' ? '' : submission.reviewStatus || '',
+            feedback: submission.feedback || '',
+            marks: submission.marks ?? '',
+          },
+        ])));
+        setReviewResults({});
       }
     } catch (err) {
       setSubmissionError(err.message || 'Failed to load student submissions.');
@@ -125,11 +137,31 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleSaveReview = async (submission) => {
+    const draft = reviewDrafts[submission._id];
+    setReviewResults((current) => ({ ...current, [submission._id]: '' }));
+    setSavingReviewId(submission._id);
+
+    try {
+      const data = await apiService.reviewSubmission(submission._id, draft);
+      setSubmissions((current) => current.map((item) => item._id === submission._id
+        ? { ...item, ...data.submission, studentId: item.studentId }
+        : item));
+      setReviewResults((current) => ({ ...current, [submission._id]: 'Review saved.' }));
+    } catch (err) {
+      setReviewResults((current) => ({ ...current, [submission._id]: err.message || 'Failed to save review.' }));
+    } finally {
+      setSavingReviewId('');
+    }
+  };
+
   // Close Modal
   const closeModal = () => {
     setSelectedAssignment(null);
     setSubmissions([]);
     setSubmissionError('');
+    setReviewDrafts({});
+    setReviewResults({});
   };
 
   // Format Date Helper
@@ -397,7 +429,7 @@ const AdminDashboard = () => {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between text-xs text-gray-500 pb-2 border-b border-gray-100">
                     <span>Total Submissions: <strong className="text-gray-800">{submissions.length}</strong></span>
-                    <span className="text-[11px] text-gray-400">Timeliness calculated automatically on submission</span>
+                    <span className="text-[11px] text-gray-400">Review each latest version below</span>
                   </div>
 
                   {submissions.map((sub, idx) => (
@@ -420,6 +452,15 @@ const AdminDashboard = () => {
                             }`}
                           >
                             Status: {sub.status}
+                          </span>
+                          <span className={`px-2.5 py-1 rounded-full font-bold text-xs ${
+                            sub.reviewStatus === 'Accepted'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : sub.reviewStatus === 'Needs Changes'
+                                ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                : 'bg-gray-100 text-gray-700 border border-gray-300'
+                          }`}>
+                            {sub.reviewStatus || 'Pending Review'}
                           </span>
                         </div>
                       </div>
@@ -453,6 +494,71 @@ const AdminDashboard = () => {
                       {/* Timestamp */}
                       <div className="pt-2 border-t border-gray-200 text-gray-500 text-[11px] flex items-center justify-between">
                         <span>Submitted: <strong>{formatDateTime(sub.submittedAt)}</strong></span>
+                        <span>Version {1 + (sub.history?.length || 0)}</span>
+                      </div>
+
+                      <div className="pt-3 border-t border-gray-200 space-y-3">
+                        <h4 className="font-semibold text-gray-800">Professor Review</h4>
+                        <label className="block">
+                          <span className="font-medium text-gray-700">Feedback</span>
+                          <textarea
+                            rows={3}
+                            value={reviewDrafts[sub._id]?.feedback ?? ''}
+                            onChange={(event) => setReviewDrafts((current) => ({
+                              ...current,
+                              [sub._id]: { ...current[sub._id], feedback: event.target.value },
+                            }))}
+                            placeholder="Give the student clear, actionable feedback"
+                            className="mt-1 w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </label>
+                        <div className="grid sm:grid-cols-[1fr_8rem] gap-3">
+                          <label className="block">
+                            <span className="font-medium text-gray-700">Decision</span>
+                            <select
+                              value={reviewDrafts[sub._id]?.reviewStatus || ''}
+                              required
+                              onChange={(event) => setReviewDrafts((current) => ({
+                                ...current,
+                                [sub._id]: { ...current[sub._id], reviewStatus: event.target.value },
+                              }))}
+                              className="mt-1 w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs text-gray-900"
+                            >
+                              <option value="" disabled>Choose decision</option>
+                              <option value="Needs Changes">Needs Changes</option>
+                              <option value="Accepted">Accepted</option>
+                            </select>
+                          </label>
+                          <label className="block">
+                            <span className="font-medium text-gray-700">Marks / 100</span>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="1"
+                              value={reviewDrafts[sub._id]?.marks ?? ''}
+                              onChange={(event) => setReviewDrafts((current) => ({
+                                ...current,
+                                [sub._id]: { ...current[sub._id], marks: event.target.value },
+                              }))}
+                              className="mt-1 w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs text-gray-900"
+                            />
+                          </label>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <p className={`text-[11px] ${reviewResults[sub._id] && reviewResults[sub._id] !== 'Review saved.' ? 'text-red-700' : 'text-emerald-700'}`}>
+                            {reviewResults[sub._id] || ''}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => handleSaveReview(sub)}
+                            disabled={savingReviewId === sub._id}
+                            className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold text-xs rounded-lg inline-flex items-center gap-1.5"
+                          >
+                            {savingReviewId === sub._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                            Save Review
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}

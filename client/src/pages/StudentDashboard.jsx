@@ -11,6 +11,7 @@ import {
   Loader2,
   ExternalLink,
   FileCheck,
+  History,
   X,
   BookOpen
 } from 'lucide-react';
@@ -53,8 +54,8 @@ const StudentDashboard = () => {
   // Open submission form modal
   const handleOpenSubmit = (assignment) => {
     setActiveAssignment(assignment);
-    setSubmissionLink('');
-    setResponseText('');
+    setSubmissionLink(assignment.mySubmission?.submissionLink || '');
+    setResponseText(assignment.mySubmission?.response || '');
     setSubmitError('');
     setSubmitSuccess('');
   };
@@ -135,7 +136,7 @@ const StudentDashboard = () => {
               Welcome, {user?.name || 'Student'}
             </h1>
             <p className="text-sm text-gray-500 mt-1">
-              Review course assignments, submit your responses, and track your timeliness status.
+              Submit coursework, read professor feedback, and track each version of your work.
             </p>
           </div>
           <button
@@ -182,6 +183,8 @@ const StudentDashboard = () => {
                 const isDeadlinePassed = new Date(assignment.deadline) < new Date();
                 const isSubmitted = assignment.isSubmitted;
                 const submission = assignment.mySubmission;
+                const reviewStatus = submission?.reviewStatus || 'Pending';
+                const canResubmit = reviewStatus === 'Needs Changes';
 
                 return (
                   <div
@@ -195,15 +198,24 @@ const StudentDashboard = () => {
                           Instructor: {assignment.createdBy?.name || 'Faculty Member'}
                         </span>
                         {isSubmitted ? (
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                          <div className="flex flex-wrap justify-end gap-1.5">
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
                               submission?.status === 'On Time'
                                 ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                                 : 'bg-rose-100 text-rose-800 border border-rose-300'
-                            }`}
-                          >
-                            Status: {submission?.status}
-                          </span>
+                            }`}>
+                              {submission?.status}
+                            </span>
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                              reviewStatus === 'Accepted'
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : canResubmit
+                                  ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                  : 'bg-gray-100 text-gray-700 border border-gray-300'
+                            }`}>
+                              {reviewStatus === 'Pending' ? 'Pending Review' : reviewStatus}
+                            </span>
+                          </div>
                         ) : (
                           <span
                             className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
@@ -236,10 +248,10 @@ const StudentDashboard = () => {
 
                       {/* If Submitted: Show submission details */}
                       {isSubmitted && submission && (
-                        <div className="p-3.5 bg-emerald-50/60 border border-emerald-200 rounded-xl text-xs space-y-2 mb-4">
+                        <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-xl text-xs space-y-2 mb-4">
                           <div className="flex items-center gap-1.5 font-semibold text-emerald-900">
                             <FileCheck className="w-4 h-4 text-emerald-600" />
-                            <span>Your Submission Details</span>
+                            <span>Latest Submission · Version {1 + (submission.history?.length || 0)}</span>
                           </div>
 
                           {submission.submissionLink && (
@@ -266,31 +278,75 @@ const StudentDashboard = () => {
                             </div>
                           )}
 
-                          <div className="pt-1 border-t border-emerald-100 text-[10px] text-gray-500 flex justify-between">
+                          <div className="pt-1 border-t border-gray-200 text-[10px] text-gray-500 flex justify-between gap-2">
                             <span>Timestamp: {formatDateTime(submission.submittedAt)}</span>
-                            <span className="font-bold text-emerald-800">1 of 1 allowed submitted</span>
+                            {submission.marks !== null && submission.marks !== undefined && (
+                              <span className="font-bold text-gray-800">Marks: {submission.marks}/100</span>
+                            )}
                           </div>
+
+                          {submission.feedback && (
+                            <div className="p-2.5 bg-white border border-blue-200 rounded-lg">
+                              <span className="font-semibold text-gray-700 block mb-1">Professor Feedback</span>
+                              <p className="text-gray-700 whitespace-pre-wrap">{submission.feedback}</p>
+                            </div>
+                          )}
+
+                          {(submission.history || []).length > 0 && (
+                            <details className="pt-2 border-t border-gray-200">
+                              <summary className="cursor-pointer list-none flex items-center gap-1.5 font-semibold text-gray-700">
+                                <History className="w-3.5 h-3.5" />
+                                Previous versions ({submission.history.length})
+                              </summary>
+                              <ol className="mt-3 space-y-3">
+                                {submission.history.map((version, index) => (
+                                  <li key={`${version.submittedAt}-${index}`} className="border-l-2 border-gray-300 pl-3 space-y-1.5">
+                                    <div className="flex flex-wrap justify-between gap-2 text-[10px] text-gray-500">
+                                      <span className="font-semibold text-gray-700">Version {index + 1} · {version.reviewStatus || 'Pending Review'}</span>
+                                      <time dateTime={version.submittedAt}>{formatDateTime(version.submittedAt)}</time>
+                                    </div>
+                                    {version.marks !== null && version.marks !== undefined && (
+                                      <p className="text-gray-700">Marks: {version.marks}/100</p>
+                                    )}
+                                    {version.feedback && <p className="text-gray-600 whitespace-pre-wrap">Feedback: {version.feedback}</p>}
+                                    {version.submissionLink && <p className="break-all text-blue-700">Link: {version.submissionLink}</p>}
+                                    {version.response && <p className="whitespace-pre-wrap text-gray-600">{version.response}</p>}
+                                  </li>
+                                ))}
+                              </ol>
+                            </details>
+                          )}
                         </div>
                       )}
                     </div>
 
                     {/* Action Button */}
                     <div className="pt-4 border-t border-gray-100">
-                      {isSubmitted ? (
-                        <button
-                          disabled
-                          className="w-full py-2.5 px-4 bg-gray-100 text-gray-500 text-xs font-semibold rounded-lg cursor-not-allowed flex items-center justify-center gap-1.5"
-                        >
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                          <span>Submitted ({submission?.status})</span>
-                        </button>
-                      ) : (
+                      {!isSubmitted ? (
                         <button
                           onClick={() => handleOpenSubmit(assignment)}
                           className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                         >
                           <Send className="w-3.5 h-3.5" />
-                          <span>View / Submit Work</span>
+                          <span>Submit Work</span>
+                        </button>
+                      ) : canResubmit ? (
+                        <button
+                          onClick={() => handleOpenSubmit(assignment)}
+                          className="w-full py-2.5 px-4 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg shadow-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Submit Revised Work</span>
+                        </button>
+                      ) : (
+                        <button
+                          disabled
+                          className="w-full py-2.5 px-4 bg-gray-100 text-gray-500 text-xs font-semibold rounded-lg cursor-not-allowed flex items-center justify-center gap-1.5"
+                        >
+                          {reviewStatus === 'Accepted'
+                            ? <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            : <Clock className="w-4 h-4 text-gray-500" />}
+                          <span>{reviewStatus === 'Accepted' ? 'Accepted · Resubmission Closed' : 'Awaiting Professor Review'}</span>
                         </button>
                       )}
                     </div>
@@ -310,7 +366,7 @@ const StudentDashboard = () => {
             <div className="p-6 border-b border-gray-200 flex items-start justify-between gap-4">
               <div>
                 <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
-                  Submit Assignment
+                  {activeAssignment.isSubmitted ? 'Submit Revised Work' : 'Submit Assignment'}
                 </span>
                 <h3 className="text-lg font-bold text-gray-900 mt-1">{activeAssignment.title}</h3>
                 <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
@@ -382,7 +438,10 @@ const StudentDashboard = () => {
               </div>
 
               <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl text-[11px] text-amber-800">
-                <strong>Important:</strong> Only one submission is permitted per assignment. Ensure your work is complete before clicking Submit Work.
+                <strong>{activeAssignment.isSubmitted ? 'Revision:' : 'Review:'}</strong>{' '}
+                {activeAssignment.isSubmitted
+                  ? 'Your previous version will remain in submission history when you submit this revision.'
+                  : 'You can submit another version only if your professor requests changes.'}
               </div>
 
               {/* Submit Buttons */}
@@ -407,7 +466,7 @@ const StudentDashboard = () => {
                   ) : (
                     <>
                       <Send className="w-3.5 h-3.5" />
-                      <span>Submit Work</span>
+                      <span>{activeAssignment.isSubmitted ? 'Submit Revision' : 'Submit Work'}</span>
                     </>
                   )}
                 </button>

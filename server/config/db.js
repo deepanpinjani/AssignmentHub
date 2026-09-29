@@ -24,6 +24,10 @@ const sanitizeMongoUri = (rawUri) => {
 };
 
 const connectDB = async () => {
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
+
   try {
     const mongoUri = sanitizeMongoUri(process.env.MONGO_URI);
 
@@ -40,6 +44,10 @@ const connectDB = async () => {
     return conn;
   } catch (error) {
     console.error('MongoDB connection failed:', error.message);
+
+    if (process.env.NODE_ENV === 'production') {
+      throw error;
+    }
 
     try {
       console.log('Falling back to embedded MongoDB Memory Server for local development.');

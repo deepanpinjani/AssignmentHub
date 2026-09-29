@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
+const seedInitialData = require('./utils/seedData');
 
 const envCandidates = [
   path.resolve(__dirname, '.env'),
@@ -60,7 +61,8 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 
 if (require.main === module) {
-  connectDB().then(() => {
+  connectDB().then(async () => {
+    await seedInitialData();
     app.listen(PORT, () => {
       console.log(`AssignmentHub Server running on port ${PORT}`);
       console.log(`Health check available at http://localhost:${PORT}/api/health`);

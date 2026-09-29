@@ -94,6 +94,12 @@ export const apiService = {
   getSubmissionsForAssignment: (assignmentId) =>
     request(`/submissions/assignment/${assignmentId}`),
 
+  reviewSubmission: (submissionId, data) =>
+    request(`/submissions/${submissionId}/review`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
   getMySubmissions: () => request('/submissions/my'),
 };
 

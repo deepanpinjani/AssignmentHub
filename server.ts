@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 // @ts-ignore
 import { app as apiApp, connectDB } from './server/server.js';
+import seedInitialData from './server/utils/seedData.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,6 +14,7 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 async function startServer() {
   await connectDB();
+  await seedInitialData();
 
   const app = express();
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5000;

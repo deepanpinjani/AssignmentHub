@@ -33,6 +33,42 @@ const submissionSchema = new mongoose.Schema({
       message: 'Status must be either "On Time" or "Late"',
     },
   },
+  reviewStatus: {
+    type: String,
+    enum: ['Pending', 'Needs Changes', 'Accepted'],
+    default: 'Pending',
+  },
+  feedback: {
+    type: String,
+    trim: true,
+    default: '',
+  },
+  marks: {
+    type: Number,
+    min: 0,
+    max: 100,
+    default: null,
+  },
+  reviewedAt: {
+    type: Date,
+    default: null,
+  },
+  reviewedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+  },
+  history: [{
+    submissionLink: { type: String, trim: true, default: '' },
+    response: { type: String, trim: true, default: '' },
+    submittedAt: { type: Date, required: true },
+    status: { type: String, enum: ['On Time', 'Late'], required: true },
+    reviewStatus: { type: String, enum: ['Pending', 'Needs Changes', 'Accepted'], default: 'Pending' },
+    feedback: { type: String, trim: true, default: '' },
+    marks: { type: Number, min: 0, max: 100, default: null },
+    reviewedAt: { type: Date, default: null },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  }],
 });
 
 // Enforce one submission per assignment per student
